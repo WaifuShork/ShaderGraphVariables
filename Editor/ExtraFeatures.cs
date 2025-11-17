@@ -50,7 +50,17 @@ namespace SGV
 	public class ExtraFeatures
 	{
 		#region Extra Features (Swap Command)
-
+		
+		public static bool CollapseNewNodes { get; private set; }
+		
+		[MenuItem("Tools/Shader Graph Variables/Settings/Nodes/Collapse New Nodes")]
+		private static void AlwaysCollapse()
+		{
+			CollapseNewNodes = !CollapseNewNodes;
+			Menu.SetChecked("Tools/Shader Graph Variables/Settings/Nodes/Collapse New Nodes", CollapseNewNodes);
+		}
+		
+		
 		[MenuItem("Tools/Shader Graph Variables/Settings/Nodes/Swap Ports On Selected Nodes _s")]
 		private static void SwapPortsCommand()
 		{
@@ -186,6 +196,8 @@ namespace SGV
 				}
 
 				EditorGUILayout.LabelField("To reset to defaults, leave fields blank", EditorStyles.wordWrappedLabel);
+				
+				
 			}
 
 			private void ClearTypes()
@@ -380,16 +392,19 @@ namespace SGV
 			}
 
 			addNodeMethod.Invoke(graphData, new[] { nodeToAdd });
-			
-			var nodePreviewMethodInfo = nodeToAdd?.GetType().GetMethod("set_previewExpanded", bindingFlags | BindingFlags.InvokeMethod);
-			nodePreviewMethodInfo?.Invoke(nodeToAdd, new object[] { false });
+			CollapseNode(nodeToAdd);
 			
 			if (m_debugMessages)
 			{
-				Debug.Log("Added Node of Type " + type.ToString());
+				Debug.Log("Added Node of Type " + type);
 			}
 		}
-		
+
+		public static void CollapseNode(object userData)
+		{
+			var nodePreviewMethodInfo = userData?.GetType().GetMethod("set_previewExpanded", bindingFlags | BindingFlags.InvokeMethod);
+			nodePreviewMethodInfo?.Invoke(userData, new object[] { false });
+		}
 
 		// Support SubGraphs
 		private static Type subGraphAssetType;
@@ -436,6 +451,8 @@ namespace SGV
 			// Load Group Colours
 			m_graphView.nodes.ForEach(node =>
 			{
+				
+				/*
 				if (node.title.Equals("Color") && node.visible)
 				{
 					if (GetSerializedValue(node) == "GroupColor")
@@ -454,6 +471,7 @@ namespace SGV
 						SetGroupColor(scope as Group, node, GetGroupNodeColor(node));
 					}
 				}
+				*/
 			});
 			//}
 

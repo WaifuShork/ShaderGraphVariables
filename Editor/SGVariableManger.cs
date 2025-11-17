@@ -104,7 +104,11 @@ namespace SGV
 			EditorApplication.update += CheckForGraphs;
 			Undo.undoRedoPerformed += OnUndoRedo;
 			m_isEnabled = true;
-			
+
+			if (m_graphView != null)
+			{
+				m_previousNodeCount = m_graphView.nodes.Count();
+			}
 		}
 
 		public static void Stop()
@@ -123,6 +127,8 @@ namespace SGV
 		// (Font needed to get string width for variable fields)
 		private static Font m_loadedFont; // = EditorGUIUtility.LoadRequired("Fonts/Inter/Inter-Regular.ttf") as Font;
 
+		private static int m_previousNodeCount;
+		
 		private static void CheckForGraphs()
 		{
 			if (Time.realtimeSinceStartup < m_initTime + 3f)
@@ -207,16 +213,18 @@ namespace SGV
 				if (node.title.Equals("Set"))
 				{
 					SetNode(node);
-				
-					var nodePreviewMethodInfo = node.userData.GetType().GetMethod("set_previewExpanded", bindingFlags | BindingFlags.InvokeMethod);
-					nodePreviewMethodInfo?.Invoke(node.userData, new object[] { false });
 				}
 				else if (node.title.Equals("Get"))
 				{
 					GetNode(node);
-				
-					var nodePreviewMethodInfo = node.userData.GetType().GetMethod("set_previewExpanded", bindingFlags | BindingFlags.InvokeMethod);
-					nodePreviewMethodInfo?.Invoke(node.userData, new object[] { false });
+				}
+
+				if (ExtraFeatures.CollapseNewNodes)
+				{
+					if (node.title != "Preview")
+					{
+						ExtraFeatures.CollapseNode(node.userData);
+					}
 				}
 			});
 		}
@@ -1565,6 +1573,7 @@ namespace SGV
 			graphData = graphDataField?.GetValue(graphEditorView);
 			graphDataType ??= graphData?.GetType();
 
+			
 			return graphView;
 		}
 
@@ -1655,6 +1664,7 @@ namespace SGV
 			
 			return materialSlotReferenceProperty?.GetValue(materialSlot);
 		}
+
 
 		private static object ConnectReflection(Edge edge, bool noValidate)
 		{
