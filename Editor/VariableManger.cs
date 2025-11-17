@@ -227,8 +227,9 @@ namespace SGV
 				else if (node.title.Equals("Get"))
 				{
 					GetNode(node);
-					CollapseNodesCommand.CollapseNode(node);
 				}
+
+				CollapseNodesCommand.CollapseNode(node);
 			});
 		}
 		
