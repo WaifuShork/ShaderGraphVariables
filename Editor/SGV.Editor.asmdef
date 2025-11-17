@@ -1,6 +1,6 @@
 {
     "name": "ShaderGraphVariables",
-    "rootNamespace": "Cyan",
+    "rootNamespace": "SGV",
     "references": [],
     "includePlatforms": [
         "Editor"
