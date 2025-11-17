@@ -104,6 +104,7 @@ namespace SGV
 			EditorApplication.update += CheckForGraphs;
 			Undo.undoRedoPerformed += OnUndoRedo;
 			m_isEnabled = true;
+			
 		}
 
 		public static void Stop()
@@ -202,15 +203,20 @@ namespace SGV
 				{
 					return;
 				}
-
+				
 				if (node.title.Equals("Set"))
 				{
-					//node.
 					SetNode(node);
+				
+					var nodePreviewMethodInfo = node.userData.GetType().GetMethod("set_previewExpanded", bindingFlags | BindingFlags.InvokeMethod);
+					nodePreviewMethodInfo?.Invoke(node.userData, new object[] { false });
 				}
 				else if (node.title.Equals("Get"))
 				{
 					GetNode(node);
+				
+					var nodePreviewMethodInfo = node.userData.GetType().GetMethod("set_previewExpanded", bindingFlags | BindingFlags.InvokeMethod);
+					nodePreviewMethodInfo?.Invoke(node.userData, new object[] { false });
 				}
 			});
 		}

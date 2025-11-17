@@ -354,9 +354,6 @@ namespace SGV
 				expandedProperty = drawState?.GetType().GetProperty("expanded", bindingFlags);
 			}
 			
-			var c = nodeToAdd?.GetType().GetMethod("set_previewExpanded", bindingFlags | BindingFlags.InvokeMethod);
-			
-			
 			positionProperty?.SetValue(drawState, position);
 			drawStateProperty?.SetValue(nodeToAdd, drawState);
 
@@ -383,13 +380,16 @@ namespace SGV
 			}
 
 			addNodeMethod.Invoke(graphData, new[] { nodeToAdd });
-			c?.Invoke(nodeToAdd, new object[] {false});
+			
+			var nodePreviewMethodInfo = nodeToAdd?.GetType().GetMethod("set_previewExpanded", bindingFlags | BindingFlags.InvokeMethod);
+			nodePreviewMethodInfo?.Invoke(nodeToAdd, new object[] { false });
 			
 			if (m_debugMessages)
 			{
 				Debug.Log("Added Node of Type " + type.ToString());
 			}
 		}
+		
 
 		// Support SubGraphs
 		private static Type subGraphAssetType;
@@ -644,10 +644,8 @@ namespace SGV
 				drawStateProperty = abstractMaterialNodeType.GetProperty("drawState", bindingFlags); // Type : DrawState
 			if (previewExpandedProperty == null)
 				previewExpandedProperty = abstractMaterialNodeType.GetProperty("previewExpanded", bindingFlags); // Type : Bool
-
-			previewExpandedProperty?.SetValue(nodeToAdd, false);
-
-			var drawState = drawStateProperty.GetValue(nodeToAdd);
+			
+			var drawState = drawStateProperty?.GetValue(nodeToAdd);
 			if (positionProperty == null)
 				positionProperty = drawState.GetType().GetProperty("position", bindingFlags);
 			if (expandedProperty == null)
@@ -668,8 +666,6 @@ namespace SGV
 			}
 
 			addNodeMethod.Invoke(graphData, new[] { nodeToAdd });
-
-		
 		}
 
 		private static string GetGroupGuid(Scope scope)
