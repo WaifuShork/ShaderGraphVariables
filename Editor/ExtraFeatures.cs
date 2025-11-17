@@ -50,8 +50,8 @@ namespace SGV
 	public class ExtraFeatures
 	{
 		#region Extra Features (Swap Command)
-		
-		public static bool CollapseNewNodes { get; private set; }
+
+		public static bool CollapseNewNodes { get; private set; } = false;
 		
 		[MenuItem("Tools/Shader Graph Variables/Settings/Nodes/Collapse New Nodes")]
 		private static void AlwaysCollapse()
@@ -275,8 +275,8 @@ namespace SGV
 			AddNodeCommand(10);
 		}
 
-		private const string c_setNodeGUID = "d455b29bada2b284ca73133c44fbc1ce";
-		private const string c_getNodeGUID = "5951f0cfb2fb4134ea014f63adeff8d9";
+		private const string c_setNodeGUID = "f49505c594d7248488282a67ecc6c615";
+		private const string c_getNodeGUID = "cef38c1ea7e751a47a90bcb3b8879a94";
 
 		private static void AddNodeCommand(int i)
 		{
@@ -302,12 +302,12 @@ namespace SGV
 				}
 				else if (node == "Set")
 				{
-					subgraphGUID = "d455b29bada2b284ca73133c44fbc1ce";
+					subgraphGUID = c_setNodeGUID;
 					node = "SubGraph";
 				}
 				else if (node == "Get")
 				{
-					subgraphGUID = "5951f0cfb2fb4134ea014f63adeff8d9";
+					subgraphGUID = c_getNodeGUID;
 					node = "SubGraph";
 				}
 
