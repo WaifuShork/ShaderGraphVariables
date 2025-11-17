@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEditor;
 using System;
 using System.Reflection;
+using JetBrains.Annotations;
 using UnityEngine.UIElements;
 using UnityEditor.Experimental.GraphView;
 using UnityEditor.ShortcutManagement;
@@ -40,29 +41,30 @@ Extra Features :
 		- https://www.cyanilux.com/tutorials/intro-to-shader-graph/#shortcuts
 
 */
-using static Cyan.SGVariables;
+using static SGV.SGVariableManger;
 
-namespace Cyan
+namespace SGV
 {
+	[PublicAPI]
 	public class ExtraFeatures
 	{
 		#region Extra Features (Swap Command)
-
+		
 		[MenuItem("Tools/SGVariables/ExtraFeatures/Commands/Swap Ports On Selected Nodes _s")]
 		private static void SwapPortsCommand()
 		{
-			if (!sgHasFocus || graphView == null) return;
-			if (debugMessages) Debug.Log("Swap Ports");
+			if (!m_sgHasFocus || m_graphView == null) return;
+			if (m_debugMessages) Debug.Log("Swap Ports");
 
-			List<ISelectable> selected = graphView.selection;
-			foreach (ISelectable s in selected)
+			var selected = m_graphView.selection;
+			foreach (var s in selected)
 			{
 				if (s is Node)
 				{
-					Node node = (Node)s;
+					var node = (Node)s;
 					var materialNode = NodeToSGMaterialNode(node);
-					string type = materialNode.GetType().ToString();
-					type = type.Substring(type.LastIndexOf('.') + 1);
+					var type = materialNode.GetType().ToString();
+					type = type[(type.LastIndexOf('.') + 1)..];
 
 					if (type == "AddNode" || type == "SubtractNode" ||
 					    type == "MultiplyNode" || type == "DivideNode" ||
@@ -71,8 +73,8 @@ namespace Cyan
 					    type == "StepNode" || type == "SmoothstepNode")
 					{
 						var inputPorts = GetInputPorts(node);
-						Port a = inputPorts.AtIndex(0);
-						Port b = inputPorts.AtIndex(1);
+						var a = inputPorts.AtIndex(0);
+						var b = inputPorts.AtIndex(1);
 
 						// Swap connections
 						Port connectedA = GetConnectedPort(a);
@@ -87,19 +89,14 @@ namespace Cyan
 							// Node doesn't update properly unless at least one connection swaps
 							var aSlot = GetMaterialSlot(a);
 							var bSlot = GetMaterialSlot(b);
+							
 							var valueProperty = aSlot.GetType().GetProperty("value");
-							var valueA = valueProperty.GetValue(aSlot);
-							var valueB = valueProperty.GetValue(bSlot);
-							valueProperty.SetValue(aSlot, valueB);
-							valueProperty.SetValue(bSlot, valueA);
+							
+							var valueA = valueProperty?.GetValue(aSlot);
+							var valueB = valueProperty?.GetValue(bSlot);
+							valueProperty?.SetValue(aSlot, valueB);
+							valueProperty?.SetValue(bSlot, valueA);
 						}
-
-						//if (connectedA == null && connectedB == null) {
-						// If there's no connections we need to update values ourself
-						//graphDataType.GetMethod("ValidateGraph").Invoke(graphData, null);
-						//abstractMaterialNodeType.GetMethod("Dirty").Invoke(materialNode, new object[]{1});
-						//graphDataType.GetMethod("ValidateGraph").Invoke(graphData, null);
-						//}
 					}
 				}
 			}
@@ -267,7 +264,7 @@ namespace Cyan
 
 		private static void AddNodeCommand(int i)
 		{
-			if (!sgHasFocus || graphView == null) return;
+			if (!m_sgHasFocus || m_graphView == null) return;
 			AddNodeType type = addNodeTypes[i - 1];
 			if (type == null)
 			{
@@ -309,7 +306,7 @@ namespace Cyan
 
 			Vector2 mousePos = Event.current.mousePosition;
 			mousePos.y -= 35;
-			Matrix4x4 matrix = graphView.viewTransform.matrix.inverse;
+			Matrix4x4 matrix = m_graphView.viewTransform.matrix.inverse;
 			Rect r = new Rect();
 			r.position = matrix.MultiplyPoint(mousePos);
 			AddNode(type, r);
@@ -364,7 +361,7 @@ namespace Cyan
 
 			addNodeMethod.Invoke(graphData, new object[] { nodeToAdd });
 
-			if (debugMessages) Debug.Log("Added Node of Type " + type.ToString());
+			if (m_debugMessages) Debug.Log("Added Node of Type " + type.ToString());
 		}
 
 		// Support SubGraphs
@@ -403,10 +400,10 @@ namespace Cyan
 
 		internal static void UpdateExtraFeatures()
 		{
-			if (!sgHasFocus) return;
+			if (!m_sgHasFocus) return;
 			//if (loadVariables) { // (first time load, but we kinda need to constantly check as groups could be copied)
 			// Load Group Colours
-			graphView.nodes.ForEach((Node node) =>
+			m_graphView.nodes.ForEach((Node node) =>
 			{
 				if (node.title.Equals("Color") && node.visible)
 				{
@@ -430,7 +427,7 @@ namespace Cyan
 			//}
 
 			// As we right-click group, add the manipulator
-			List<ISelectable> selected = graphView.selection;
+			List<ISelectable> selected = m_graphView.selection;
 			bool groupSelected = false;
 			foreach (ISelectable s in selected)
 			{
@@ -647,7 +644,7 @@ namespace Cyan
 
 		private static Node GetGroupColorNode(string guid)
 		{
-			List<Node> nodes = graphView.nodes.ToList();
+			List<Node> nodes = m_graphView.nodes.ToList();
 			foreach (Node node in nodes)
 			{
 				if (node.title.Equals("Color"))
