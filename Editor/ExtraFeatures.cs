@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
 using System;
+using System.Linq;
 using System.Reflection;
 using JetBrains.Annotations;
 using UnityEngine.UIElements;
@@ -261,7 +262,9 @@ namespace SGV
 		{
 			AddNodeCommand(10);
 		}
-		
+
+		private const string c_setNodeGUID = "d455b29bada2b284ca73133c44fbc1ce";
+		private const string c_getNodeGUID = "5951f0cfb2fb4134ea014f63adeff8d9";
 
 		private static void AddNodeCommand(int i)
 		{
@@ -350,7 +353,10 @@ namespace SGV
 			{
 				expandedProperty = drawState?.GetType().GetProperty("expanded", bindingFlags);
 			}
-
+			
+			var c = nodeToAdd?.GetType().GetMethod("set_previewExpanded", bindingFlags | BindingFlags.InvokeMethod);
+			
+			
 			positionProperty?.SetValue(drawState, position);
 			drawStateProperty?.SetValue(nodeToAdd, drawState);
 
@@ -377,8 +383,12 @@ namespace SGV
 			}
 
 			addNodeMethod.Invoke(graphData, new[] { nodeToAdd });
-
-			if (m_debugMessages) Debug.Log("Added Node of Type " + type.ToString());
+			c?.Invoke(nodeToAdd, new object[] {false});
+			
+			if (m_debugMessages)
+			{
+				Debug.Log("Added Node of Type " + type.ToString());
+			}
 		}
 
 		// Support SubGraphs
@@ -536,6 +546,7 @@ namespace SGV
 				editingGroupColorNode = null;
 			}
 		}
+		
 
 		private static Type colorPickerType;
 
@@ -657,6 +668,8 @@ namespace SGV
 			}
 
 			addNodeMethod.Invoke(graphData, new[] { nodeToAdd });
+
+		
 		}
 
 		private static string GetGroupGuid(Scope scope)

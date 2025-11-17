@@ -1098,7 +1098,6 @@ namespace SGV
 
 			previousValue = previousValue.Trim();
 			newValue = newValue.Trim();
-			Debug.Log(newValue);
 
 			// dictionary keys (always upper case)
 			var previousKey = previousValue.ToUpper();
