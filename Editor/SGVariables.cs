@@ -159,7 +159,7 @@ namespace Cyan {
 
 			Action<Node> nodeAction = (Node node) => {
 				if (node == null) return;
-				if (node.title.Equals("Register Variable")) {
+				if (node.title.Equals("Set")) {
 					TextField field = TryGetTextField(node);
 					if (field == null) {
 						// Register Variable Setup (called once)
@@ -224,7 +224,7 @@ namespace Cyan {
 						var outputPorts = GetOutputPorts(node);
 						foreach (Port output in outputPorts.ToList()){
 							Port connectedInput = GetConnectedPort(output);
-							if (connectedInput != null && !connectedInput.node.title.Equals("Get Variable")){
+							if (connectedInput != null && !connectedInput.node.title.Equals("Get")){
 								DisconnectAllEdges(node, output);
 							}
 							// Not allowed to connect to the outputs of Register Variable node
@@ -251,7 +251,7 @@ namespace Cyan {
 						// Make edges invisible
 						Action<Port> portAction = (Port output) => {
 							foreach (var edge in output.connections) {
-								if (edge.input.node.title.Equals("Get Variable")) {
+								if (edge.input.node.title.Equals("Get")) {
 									if (edge.visible && !debugDontHideEdges) edge.visible = false;
 								}
 							}
@@ -275,7 +275,7 @@ namespace Cyan {
 							ShowElement(field);
 						}
 					}
-				} else if (node.title.Equals("Get Variable")) {
+				} else if (node.title.Equals("Get")) {
 				#if UNITY_2021_2_OR_NEWER
                     DropdownField field = TryGetDropdownField(node);
 				#else
@@ -645,7 +645,7 @@ namespace Cyan {
 		}
 
 		private static NodePortType GetNodePortType(Node node) {
-			bool isRegisterNode = (node.title.Equals("Register Variable"));
+			bool isRegisterNode = (node.title.Equals("Set"));
 
 			var inputPorts = GetInputPorts(node);
 			var outputPorts = GetOutputPorts(node);
@@ -685,7 +685,7 @@ namespace Cyan {
 		}
 
 		private static void SetNodePortType(Node node, NodePortType portType) {
-			bool isRegisterNode = (node.title.Equals("Register Variable"));
+			bool isRegisterNode = (node.title.Equals("Set"));
 
 			var inputPorts = GetInputPorts(node);
 			var outputPorts = GetOutputPorts(node);
@@ -919,7 +919,7 @@ namespace Cyan {
 
 			List<Node> linkedNodes = new List<Node>();
 			Action<Node> nodeAction = (Node n) => {
-				if (n.title.Equals("Get Variable")) {
+				if (n.title.Equals("Get")) {
 					string key2 = GetSerializedVariableKey(n).ToUpper();
 					if (key == key2) {
 						LinkRegisterToGetVariableNode(registerNode, n);
