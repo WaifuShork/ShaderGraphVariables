@@ -13,7 +13,7 @@ Author : Cyanilux (https://twitter.com/Cyanilux)
 Github Repo : https://github.com/Cyanilux/ShaderGraphVariables
 
 Main Feature :
-	- Adds Register Variable and Get Variable nodes to Shader Graph, allowing you to link sections of a graph without connection wires.
+	- Adds 'Set' and 'Get' nodes to Shader Graph, allowing you to link sections of a graph without connection wires.
 		- These nodes (technically subgraphs) include a TextField where you can enter a variable name (not case sensitive).
 		- They automatically link up with invisible connections/wires/edges.
 		- These variables are local to the graph - they won't be shared between other graphs or subgraphs.
@@ -37,7 +37,7 @@ Setup:
 	- Alternatively, download and put the folder in your Assets
 
 Usage : 
-	1) Add Node → Register Variable
+	1) Add Node → 'Set'
 		- The node has a text field in the place of it's output port where you can type a variable name.
 		- Attach a Float/Vector to the input port.
 	2) Add Node → Get Variable
@@ -50,7 +50,7 @@ Usage :
 Known Issues :
 	- If a 'Get Variable' node is connected to the vertex stage and then a name is entered, it can cause shader errors
 		if fragment-only nodes are used by the variable (e.g. cannot map expression to vs_5_0 instruction set)
-	- If a DynamicVector/DynamicValue output port (most math nodes) changes type (because of it's inputs), it wont update type of Get/Register Variable nodes connected previously.
+	- If a DynamicVector/DynamicValue output port (most math nodes) changes type (because of it's inputs), it wont update type of Get/'Set' nodes connected previously.
 	- Got an issue, check : https://github.com/Cyanilux/ShaderGraphVariables/issues, if it's not there, add it!
 */
 
@@ -162,7 +162,7 @@ namespace Cyan {
 				if (node.title.Equals("Set")) {
 					TextField field = TryGetTextField(node);
 					if (field == null) {
-						// Register Variable Setup (called once)
+						// 'Set' Setup (called once)
 						field = CreateTextField(node, out string variableName);
 						field.style.marginLeft = 25;
 						field.style.marginRight = 4;
@@ -227,8 +227,8 @@ namespace Cyan {
 							if (connectedInput != null && !connectedInput.node.title.Equals("Get")){
 								DisconnectAllEdges(node, output);
 							}
-							// Not allowed to connect to the outputs of Register Variable node
-							// (unless it's the Get Variable node, which is connected automatically)
+							// Not allowed to connect to the outputs of 'Set' node
+							// (unless it's the 'Get' node, which is connected automatically)
 							// This can happen if node was created while dragging an edge from an input port
 						}
 
@@ -239,7 +239,7 @@ namespace Cyan {
 						// If this breaks, an alternative is to just check the ports each frame for different types
 
 					} else {
-						// Register Variable Update (called each frame)
+						// 'Set' Update (called each frame)
 						if (loadVariables) {
 							Register("", field.value, node);
 						}
@@ -285,7 +285,7 @@ namespace Cyan {
 					TextField field = TryGetTextField(node);
 				#endif
 					if (field == null) {
-						// Get Variable Setup (called once)
+						// 'Get' Setup (called once)
 					#if UNITY_2021_2_OR_NEWER
 						field = CreateDropDownField(node, out string variableName);
 					#else
@@ -300,17 +300,17 @@ namespace Cyan {
 						Port outputFloat = outputPorts.AtIndex(1);
 
 						// If both output ports are visible, do setup :
-						// (as Register Variable node may trigger it first)
+						// (as 'Set' node may trigger it first)
 						if (!IsPortHidden(outputVector) && !IsPortHidden(outputFloat)) {
 							string key = GetSerializedVariableKey(node);
 							ResizeNodeToFitText(node, key);
 
 							//Get(key, node); // causes errors in 2022
-							// (I think due to the DisconnectAllInputs then reconnecting later when Register Variable node triggers linking...)
+							// (I think due to the DisconnectAllInputs then reconnecting later when 'Set' node triggers linking...)
 
 							key = key.Trim().ToUpper();
 							if (variableDict.TryGetValue(key, out Node varNode)) {
-								// Make sure Get Variable node matches Register Variable type
+								// Make sure 'Get' node matches 'Set' type
 								// accounts for node being copied
 								SetNodePortType(node, GetNodePortType(varNode));
 							} else {
@@ -331,7 +331,7 @@ namespace Cyan {
 						}
 
 					} else {
-						// Get Variable Update (called each frame)
+						// 'Get' Update (called each frame)
 						if (!node.expanded) {
 							bool hasPorts = node.RefreshPorts();
 							if (!hasPorts) HideElement(field);
@@ -407,8 +407,8 @@ namespace Cyan {
 						/*
 						- While this works, it introduces a problem where
 							if we trigger the Dynamic port to change type by connecting to input ports
-							(e.g. a Vector4 node into a Multiply already connected to Register Variable)
-							it doesn't trigger the port Connect/Disconnect so the type of the Register Variable isn't updated!
+							(e.g. a Vector4 node into a Multiply already connected to 'Set')
+							it doesn't trigger the port Connect/Disconnect so the type of the 'Set' isn't updated!
 						*/
 
 						SetNodePortType(node, portType);
@@ -438,7 +438,7 @@ namespace Cyan {
 		}
 
         private static TextField CreateTextField(Node node, out string variableName) {
-			// Get Variable Name (saved in the node's "synonyms" field)
+			// 'Get' Name (saved in the node's "synonyms" field)
 			variableName = GetSerializedVariableKey(node);
 
 			// Setup Text Field 
@@ -475,7 +475,7 @@ namespace Cyan {
         }
 
         private static DropdownField CreateDropDownField(Node node, out string variableName) {
-            // Get Variable Name (saved in the node's "synonyms" field)
+            // 'Get' Name (saved in the node's "synonyms" field)
             variableName = GetSerializedVariableKey(node);
 
             // Setup Text Field 
@@ -561,7 +561,7 @@ namespace Cyan {
 		#endregion
 
 		#region Get Input/Output Ports
-		// Register/Get Variable nodes support these types, should match port order
+		// Register/'Get' nodes support these types, should match port order
 		private enum NodePortType {
 			Vector4, // also DynamicVector, DynamicValue
 			Float,
@@ -764,7 +764,7 @@ namespace Cyan {
 			}
 
 			if (isRegisterNode && typeChanged) {
-				// Relink to Get Variable nodes
+				// Relink to 'Get' nodes
 				List<Node> nodes = LinkToAllGetVariableNodes(GetSerializedVariableKey(node).ToUpper(), node);
 				foreach (Node n in nodes) {
 					SetNodePortType(n, portType);
@@ -840,7 +840,7 @@ namespace Cyan {
 				}
 
 				if (n == null || n.userData == null) {
-					// Occurs if previous Register Variable node was deleted
+					// Occurs if previous 'Set' node was deleted
 					if (debugMessages) Debug.Log("Replaced Null");
 					variableDict.Remove(newKey);
 					variableNames.Remove(newValue);
@@ -890,7 +890,7 @@ namespace Cyan {
 				// OLD Behaviour : Disconnect
 				/*
 				// As the value has changed, disconnect any output edges
-				// But first, change Get Variable node types back to Vector4 default
+				// But first, change 'Get' node types back to Vector4 default
 				Port outputPort = outputPorts.AtIndex(0); // (doesn't matter which port we use, as all should be connected)
 				foreach (Edge edge in outputPort.connections) {
 					if (edge.input != null && edge.input.node != null) {
@@ -912,7 +912,7 @@ namespace Cyan {
 		}
 
 		/// <summary>
-		/// Used on a Register Variable node to link it to all Get Variable nodes in the graph.
+		/// Used on a 'Set' node to link it to all 'Get' nodes in the graph.
 		/// </summary>
 		private static List<Node> LinkToAllGetVariableNodes(string key, Node registerNode) {
 			if (debugMessages) Debug.Log("LinkToAllGetVariableNodes(" + key + ")");
@@ -934,7 +934,7 @@ namespace Cyan {
 		}
 
 		/// <summary>
-		/// Links each output port on the Register Variable node to the input on the Get Variable node (does not ValidateGraph, call manually)
+		/// Links each output port on the 'Set' node to the input on the 'Get' node (does not ValidateGraph, call manually)
 		/// </summary>
 		private static void LinkRegisterToGetVariableNode(Node registerNode, Node getNode) {
 			//if (debugMessages) Debug.Log("Linked Register -> Get");
@@ -952,7 +952,7 @@ namespace Cyan {
 		}
 
 		/// <summary>
-		/// Gets the variable from the variables dictionary and links the Get Variable node to the stored Register Variable node.
+		/// Gets the variable from the variables dictionary and links the 'Get' node to the stored 'Set' node.
 		/// </summary>
 		private static void Get(string key, Node node) {
 			ResizeNodeToFitText(node, key);
@@ -970,10 +970,10 @@ namespace Cyan {
 				//var outputPorts = GetOutputPorts(varNode);
 				//var inputPorts = GetInputPorts(node);
 
-				// Make sure Get Variable node matches Register Variable type
+				// Make sure 'Get' node matches 'Set' type
 				SetNodePortType(node, GetNodePortType(varNode));
 
-				// Link, Register Variable > Get Variable
+				// Link, 'Set' > Get Variable
 				DisconnectAllInputs(node);
 				LinkRegisterToGetVariableNode(varNode, node);
 				//revalidateGraph = true;
@@ -1020,7 +1020,7 @@ namespace Cyan {
 				// https://github.com/Unity-Technologies/Graphics/blob/3f3263397f0c880135b4f42d623f1510a153e20e/com.unity.shadergraph/Editor/Util/CopyPasteGraph.cs#L149
 
 				ShowValidationError(edge.input.node, "Failed to Get Variable! Did you create a loop?");
-				// Preview may also be incorrect if Register Variable node is float type here
+				// Preview may also be incorrect if 'Set' node is float type here
 			}
 			return edge;
 		}
