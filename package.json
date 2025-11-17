@@ -1,5 +1,5 @@
 {
-	"name": "com.cyanilux.shadergraph-variables",
+	"name": "com.sharkbyte-interactive.shadergraph-variables",
 	"version": "1.0.9",
 	"displayName": "Shader Graph Variables",
 	"description": "Adds 'Set' and 'Get' nodes to Shader Graph, allowing you to link sections of a graph without connection wires",
@@ -7,7 +7,7 @@
 	  "Shader Graph"
 	],
 	"author": {
-	  "name": "Cyanilux",
-	  "url": "https://twitter.com/Cyanilux"
+	  "name": "Sharkbyte Interactive",
+	  "url": "https://sharkbyteinteractive.com"
 	}
   }
