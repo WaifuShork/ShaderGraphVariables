@@ -222,15 +222,11 @@ namespace SGV
 				if (node.title.Equals("Set"))
 				{
 					SetNode(node);
+					CollapseNodesCommand.CollapseNode(node);
 				}
 				else if (node.title.Equals("Get"))
 				{
 					GetNode(node);
-				}
-
-				if (!m_nodes.Contains(node))
-				{
-					m_nodes.Add(node);
 					CollapseNodesCommand.CollapseNode(node);
 				}
 			});
