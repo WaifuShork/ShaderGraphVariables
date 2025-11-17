@@ -49,8 +49,8 @@ namespace SGV
 	public class ExtraFeatures
 	{
 		#region Extra Features (Swap Command)
-		
-		[MenuItem("Tools/SGVariables/ExtraFeatures/Commands/Swap Ports On Selected Nodes _s")]
+
+		[MenuItem("Tools/Shader Graph Variables/Settings/Nodes/Swap Ports On Selected Nodes _s")]
 		private static void SwapPortsCommand()
 		{
 			if (!m_sgHasFocus || m_graphView == null) return;
@@ -77,8 +77,8 @@ namespace SGV
 						var b = inputPorts.AtIndex(1);
 
 						// Swap connections
-						Port connectedA = GetConnectedPort(a);
-						Port connectedB = GetConnectedPort(b);
+						var connectedA = GetConnectedPort(a);
+						var connectedB = GetConnectedPort(b);
 						DisconnectAllInputs(node);
 						if (connectedA != null) Connect(connectedA, b);
 						if (connectedB != null) Connect(connectedB, a);
@@ -89,9 +89,9 @@ namespace SGV
 							// Node doesn't update properly unless at least one connection swaps
 							var aSlot = GetMaterialSlot(a);
 							var bSlot = GetMaterialSlot(b);
-							
-							var valueProperty = aSlot.GetType().GetProperty("value");
-							
+
+							var valueProperty = aSlot?.GetType().GetProperty("value");
+
 							var valueA = valueProperty?.GetValue(aSlot);
 							var valueB = valueProperty?.GetValue(bSlot);
 							valueProperty?.SetValue(aSlot, valueB);
@@ -108,20 +108,22 @@ namespace SGV
 
 		private class AddNodeType
 		{
-			public Type type;
-			public string subgraphGUID; // guid if type is UnityEditor.ShaderGraph.SubGraphNode
+			public readonly Type Type;
+			public readonly string SubgraphGUID; // guid if type is UnityEditor.ShaderGraph.SubGraphNode
 
 			public AddNodeType(Type type, string subgraphGUID)
 			{
-				this.type = type;
-				this.subgraphGUID = subgraphGUID;
+				Type = type;
+				SubgraphGUID = subgraphGUID;
 			}
 		}
 
-		private static AddNodeType[] addNodeTypes = new AddNodeType[10];
+		private static AddNodeType[] addNodeTypes = new AddNodeType[12];
 
-		private static readonly string[] addNodeDefaults = new string[]
+		private static readonly string[] addNodeDefaults = new[]
 		{
+			"Get",
+			"Set",
 			"Add",
 			"Subtract",
 			"Multiply",
@@ -130,56 +132,54 @@ namespace SGV
 			"OneMinus",
 			"Negate",
 			"Absolute",
-			"Step",
-			"Smoothstep"
 		};
 
 		#region Extra Features (Rebind)
 
 		private class RebindWindow : EditorWindow
 		{
-			private string shortcutID = "Main Menu/Tools/SGVariables/ExtraFeatures/Commands/Add Node ";
-			private string[] shortcuts;
-			private string[] values;
+			private const string c_shortcutID = "Main Menu/Tools/Shader Graph Variables/Nodes/Add Node ";
+			private string[] m_shortcuts;
+			private string[] m_values;
 
 			//private IShortcutManager shortcutManager;
 
-			void OnEnable()
+			private void OnEnable()
 			{
-				IShortcutManager shortcutManager = ShortcutManager.instance;
-				shortcuts = new string[10];
-				values = new string[10];
-				for (int i = 0; i < 10; i++)
+				var shortcutManager = ShortcutManager.instance;
+				m_shortcuts = new string[addNodeDefaults.Length];
+				m_values = new string[addNodeDefaults.Length];
+				for (var i = 0; i < addNodeDefaults.Length; i++)
 				{
-					ShortcutBinding shortcut = shortcutManager.GetShortcutBinding(shortcutID + (i + 1));
-					shortcuts[i] = shortcut.ToString();
+					var shortcut = shortcutManager.GetShortcutBinding(c_shortcutID + (i + 1));
+					m_shortcuts[i] = shortcut.ToString();
 
-					string s = EditorPrefs.GetString("CyanSGVariables_Node" + (i + 1));
-					if (s == null || s == "")
+					var s = EditorPrefs.GetString("SGVariables_Node" + (i + 1));
+					if (string.IsNullOrWhiteSpace(s))
 					{
 						s = addNodeDefaults[i];
 					}
 
-					values[i] = s;
+					m_values[i] = s;
 				}
 			}
 
-			void OnGUI()
+			private void OnGUI()
 			{
 				EditorGUILayout.LabelField("Add Node Bindings", EditorStyles.boldLabel);
 				EditorGUILayout.LabelField("Note : You can also change the hotkeys in Edit -> Shortcuts, search for SGVariables", EditorStyles.wordWrappedLabel);
 				EditorGUILayout.LabelField("The values here should match the class used by a node. Should be the same as the node name, without spaces. "
 				                         + "Won't support pipeline-specific nodes, only searches the UnityEngine.ShaderGraph namespace.", EditorStyles.wordWrappedLabel);
-				EditorGUILayout.LabelField("Also supports 'RegisterVariable' and 'GetVariable', for other SubGraphs use \"SubGraph(<guid>)\", "
+				EditorGUILayout.LabelField("Also supports 'Set' and 'Get', for other SubGraphs use \"SubGraph(<guid>)\", "
 				                         + "where guid is the string located at the top of the .meta file associated with the SubGraph.", EditorStyles.wordWrappedLabel);
-				for (int i = 0; i < 10; i++)
+				for (var i = 0; i < addNodeDefaults.Length; i++)
 				{
 					EditorGUI.BeginChangeCheck();
-					string s = EditorGUILayout.TextField("Node Binding " + (i + 1) + " (" + shortcuts[i] + ")", values[i]);
+					var s = EditorGUILayout.TextField("Node Binding " + (i + 1) + " (" + m_shortcuts[i] + ")", m_values[i]);
 					if (EditorGUI.EndChangeCheck())
 					{
-						EditorPrefs.SetString("CyanSGVariables_Node" + (i + 1), System.Text.RegularExpressions.Regex.Replace(s, @"\s+", ""));
-						values[i] = s;
+						EditorPrefs.SetString("SGVariables_Node" + (i + 1), System.Text.RegularExpressions.Regex.Replace(s, @"\s+", ""));
+						m_values[i] = s;
 						ClearTypes();
 					}
 				}
@@ -189,87 +189,88 @@ namespace SGV
 
 			private void ClearTypes()
 			{
-				addNodeTypes = new AddNodeType[10];
+				addNodeTypes = new AddNodeType[addNodeDefaults.Length];
 			}
 		}
 
-		[MenuItem("Tools/SGVariables/ExtraFeatures/Remap Node Bindings", false, 0)]
+		[MenuItem("Tools/Shader Graph Variables/Settings/Modify Shortcut Nodes", false, 0)]
 		private static void RebindNodes()
 		{
-			RebindWindow window = (RebindWindow)EditorWindow.GetWindow(typeof(RebindWindow));
+			var window = (RebindWindow)EditorWindow.GetWindow(typeof(RebindWindow));
 			window.Show();
 		}
 
 		#endregion
 
-		[MenuItem("Tools/SGVariables/ExtraFeatures/Commands/Add Node 1 _1")]
+		[MenuItem("Tools/Shader Graph Variables/Settings/Nodes/Add Node 1 _1", priority = 1)]
 		private static void AddNodeCommand1()
 		{
 			AddNodeCommand(1);
 		}
 
-		[MenuItem("Tools/SGVariables/ExtraFeatures/Commands/Add Node 2 _2")]
+		[MenuItem("Tools/Shader Graph Variables/Settings/Nodes/Add Node 2 _2", priority = 2)]
 		private static void AddNodeCommand2()
 		{
 			AddNodeCommand(2);
 		}
 
-		[MenuItem("Tools/SGVariables/ExtraFeatures/Commands/Add Node 3 _3")]
+		[MenuItem("Tools/Shader Graph Variables/Settings/Nodes/Add Node 3 _3", priority = 3)]
 		private static void AddNodeCommand3()
 		{
 			AddNodeCommand(3);
 		}
 
-		[MenuItem("Tools/SGVariables/ExtraFeatures/Commands/Add Node 4 _4")]
+		[MenuItem("Tools/Shader Graph Variables/Settings/Nodes/Add Node 4 _4", priority = 4)]
 		private static void AddNodeCommand4()
 		{
 			AddNodeCommand(4);
 		}
 
-		[MenuItem("Tools/SGVariables/ExtraFeatures/Commands/Add Node 5 _5")]
+		[MenuItem("Tools/Shader Graph Variables/Settings/Nodes/Add Node 5 _5", priority = 5)]
 		private static void AddNodeCommand5()
 		{
 			AddNodeCommand(5);
 		}
 
-		[MenuItem("Tools/SGVariables/ExtraFeatures/Commands/Add Node 6 _6")]
+		[MenuItem("Tools/Shader Graph Variables/Settings/Nodes/Add Node 6 _6", priority = 6)]
 		private static void AddNodeCommand6()
 		{
 			AddNodeCommand(6);
 		}
 
-		[MenuItem("Tools/SGVariables/ExtraFeatures/Commands/Add Node 7 _7")]
+		[MenuItem("Tools/Shader Graph Variables/Settings/Nodes/Add Node 7 _7", priority = 7)]
 		private static void AddNodeCommand7()
 		{
 			AddNodeCommand(7);
 		}
 
-		[MenuItem("Tools/SGVariables/ExtraFeatures/Commands/Add Node 8 _8")]
+		[MenuItem("Tools/Shader Graph Variables/Settings/Nodes/Add Node 8 _8", priority = 8)]
 		private static void AddNodeCommand8()
 		{
 			AddNodeCommand(8);
 		}
 
-		[MenuItem("Tools/SGVariables/ExtraFeatures/Commands/Add Node 9 _9")]
+		[MenuItem("Tools/Shader Graph Variables/Settings/Nodes/Add Node 9 _9", priority = 9)]
 		private static void AddNodeCommand9()
 		{
 			AddNodeCommand(9);
 		}
 
-		[MenuItem("Tools/SGVariables/ExtraFeatures/Commands/Add Node 10 _0")]
+		[MenuItem("Tools/Shader Graph Variables/Settings/Nodes/Add Node 10 _0", priority = 10)]
 		private static void AddNodeCommand10()
 		{
 			AddNodeCommand(10);
 		}
+		
 
 		private static void AddNodeCommand(int i)
 		{
 			if (!m_sgHasFocus || m_graphView == null) return;
-			AddNodeType type = addNodeTypes[i - 1];
+			var type = addNodeTypes[i - 1];
 			if (type == null)
 			{
-				string node = EditorPrefs.GetString("CyanSGVariables_Node" + i);
-				if (node == null || node == "")
+				var node = EditorPrefs.GetString("SGVariables_Node" + i);
+				if (string.IsNullOrWhiteSpace(node))
 				{
 					// Use default
 					node = addNodeDefaults[i - 1];
@@ -278,24 +279,24 @@ namespace SGV
 				string subgraphGUID = null;
 				if (node.Contains("SubGraph"))
 				{
-					int start = node.IndexOf('(');
-					int end = node.LastIndexOf(')');
-					int length = end - start - 1;
+					var start = node.IndexOf('(');
+					var end = node.LastIndexOf(')');
+					var length = end - start - 1;
 					subgraphGUID = node.Substring(start + 1, length);
 					node = "SubGraph";
 				}
-				else if (node == "RegisterVariable")
+				else if (node == "Set")
 				{
 					subgraphGUID = "d455b29bada2b284ca73133c44fbc1ce";
 					node = "SubGraph";
 				}
-				else if (node == "GetVariable")
+				else if (node == "Get")
 				{
 					subgraphGUID = "5951f0cfb2fb4134ea014f63adeff8d9";
 					node = "SubGraph";
 				}
 
-				string typeString = "UnityEditor.ShaderGraph." + node + "Node";
+				var typeString = "UnityEditor.ShaderGraph." + node + "Node";
 				type = new AddNodeType(sgAssembly.GetType(typeString), subgraphGUID);
 				addNodeTypes[i - 1] = type;
 				if (type == null)
@@ -304,11 +305,13 @@ namespace SGV
 				}
 			}
 
-			Vector2 mousePos = Event.current.mousePosition;
+			var mousePos = Event.current.mousePosition;
 			mousePos.y -= 35;
-			Matrix4x4 matrix = m_graphView.viewTransform.matrix.inverse;
-			Rect r = new Rect();
-			r.position = matrix.MultiplyPoint(mousePos);
+			var matrix = m_graphView.viewTransform.matrix.inverse;
+			var r = new Rect
+			{
+				position = matrix.MultiplyPoint(mousePos)
+			};
 			AddNode(type, r);
 		}
 
@@ -322,7 +325,7 @@ namespace SGV
 		private static void AddNode(AddNodeType addNodeType, Rect position)
 		{
 			if (addNodeType == null) return;
-			Type type = addNodeType.type;
+			var type = addNodeType.Type;
 			if (type == null) return;
 			var nodeToAdd = Activator.CreateInstance(type);
 			if (nodeToAdd == null)
@@ -337,29 +340,43 @@ namespace SGV
 				drawStateProperty = abstractMaterialNodeType.GetProperty("drawState", bindingFlags); // Type : DrawState
 			}
 
-			var drawState = drawStateProperty.GetValue(nodeToAdd);
+			var drawState = drawStateProperty?.GetValue(nodeToAdd);
 			if (positionProperty == null)
-				positionProperty = drawState.GetType().GetProperty("position", bindingFlags);
-			if (expandedProperty == null)
-				expandedProperty = drawState.GetType().GetProperty("expanded", bindingFlags);
+			{
+				positionProperty = drawState?.GetType().GetProperty("position", bindingFlags);
+			}
 
-			positionProperty.SetValue(drawState, position);
-			drawStateProperty.SetValue(nodeToAdd, drawState);
+			if (expandedProperty == null)
+			{
+				expandedProperty = drawState?.GetType().GetProperty("expanded", bindingFlags);
+			}
+
+			positionProperty?.SetValue(drawState, position);
+			drawStateProperty?.SetValue(nodeToAdd, drawState);
 
 			// Handle SubGraph GUID
-			string subgraphGUID = addNodeType.subgraphGUID;
+			var subgraphGUID = addNodeType.SubgraphGUID;
 			if (subgraphGUID != null)
 			{
-				if (subGraphAssetProperty == null) subGraphAssetProperty = type.GetProperty("asset");
-				object asset = GetSubGraphAsset(subgraphGUID);
-				if (asset != null) subGraphAssetProperty.SetValue(nodeToAdd, asset);
+				if (subGraphAssetProperty == null)
+				{
+					subGraphAssetProperty = type.GetProperty("asset");
+				}
+
+				var asset = GetSubGraphAsset(subgraphGUID);
+				if (asset != null)
+				{
+					subGraphAssetProperty?.SetValue(nodeToAdd, asset);
+				}
 			}
 
 			// GraphData.AddNode(abstractMaterialNode)
 			if (addNodeMethod == null)
+			{
 				addNodeMethod = graphDataType.GetMethod("AddNode", bindingFlags);
+			}
 
-			addNodeMethod.Invoke(graphData, new object[] { nodeToAdd });
+			addNodeMethod.Invoke(graphData, new[] { nodeToAdd });
 
 			if (m_debugMessages) Debug.Log("Added Node of Type " + type.ToString());
 		}
@@ -369,7 +386,11 @@ namespace SGV
 
 		public static object GetSubGraphAsset(string guidString)
 		{
-			if (subGraphAssetType == null) subGraphAssetType = sgAssembly.GetType("UnityEditor.ShaderGraph.SubGraphAsset");
+			if (subGraphAssetType == null)
+			{
+				subGraphAssetType = sgAssembly.GetType("UnityEditor.ShaderGraph.SubGraphAsset");
+			}
+
 			return AssetDatabase.LoadAssetAtPath(AssetDatabase.GUIDToAssetPath(guidString), subGraphAssetType);
 		}
 
@@ -379,10 +400,10 @@ namespace SGV
 
 		private static string GetSerializedValue(Node node)
 		{
-			object materialNode = NodeToSGMaterialNode(node);
+			var materialNode = NodeToSGMaterialNode(node);
 			if (materialNode != null)
 			{
-				string[] synonyms = GetSerializedValues(materialNode);
+				var synonyms = GetSerializedValues(materialNode);
 				if (synonyms != null && synonyms.Length > 0)
 				{
 					return synonyms[0];
@@ -394,8 +415,8 @@ namespace SGV
 
 		private static void SetSerializedValue(Node node, string key)
 		{
-			object materialNode = NodeToSGMaterialNode(node);
-			SetSerializedValues(materialNode, new string[] { key });
+			var materialNode = NodeToSGMaterialNode(node);
+			SetSerializedValues(materialNode, new[] { key });
 		}
 
 		internal static void UpdateExtraFeatures()
@@ -403,7 +424,7 @@ namespace SGV
 			if (!m_sgHasFocus) return;
 			//if (loadVariables) { // (first time load, but we kinda need to constantly check as groups could be copied)
 			// Load Group Colours
-			m_graphView.nodes.ForEach((Node node) =>
+			m_graphView.nodes.ForEach(node =>
 			{
 				if (node.title.Equals("Color") && node.visible)
 				{
@@ -427,19 +448,19 @@ namespace SGV
 			//}
 
 			// As we right-click group, add the manipulator
-			List<ISelectable> selected = m_graphView.selection;
-			bool groupSelected = false;
-			foreach (ISelectable s in selected)
+			var selected = m_graphView.selection;
+			var groupSelected = false;
+			foreach (var s in selected)
 			{
 				if (s is Group)
 				{
-					Group group = (Group)s;
+					var group = (Group)s;
 					groupSelected = true;
 
 					// Set selection colour (if overriden)
 					if (group.style.borderTopColor != StyleKeyword.Null)
 					{
-						Color selectedColor = new Color(0.266f, 0.75f, 1, 1);
+						var selectedColor = new Color(0.266f, 0.75f, 1, 1);
 						group.style.borderTopColor = selectedColor;
 						group.style.borderBottomColor = selectedColor;
 						group.style.borderLeftColor = selectedColor;
@@ -456,7 +477,7 @@ namespace SGV
 							var colorNode = GetGroupColorNode(GetGroupGuid(editingGroup));
 							if (colorNode != null)
 							{
-								Color groupColor = GetGroupNodeColor(colorNode);
+								var groupColor = GetGroupNodeColor(colorNode);
 								editingGroup.style.borderTopColor = groupColor;
 								editingGroup.style.borderBottomColor = groupColor;
 								editingGroup.style.borderLeftColor = groupColor;
@@ -481,7 +502,7 @@ namespace SGV
 					var colorNode = GetGroupColorNode(GetGroupGuid(editingGroup));
 					if (colorNode != null)
 					{
-						Color groupColor = GetGroupNodeColor(colorNode);
+						var groupColor = GetGroupNodeColor(colorNode);
 						editingGroup.style.borderTopColor = groupColor;
 						editingGroup.style.borderBottomColor = groupColor;
 						editingGroup.style.borderLeftColor = groupColor;
@@ -495,7 +516,7 @@ namespace SGV
 			// User clicked context menu, show Color Picker
 			if (editingGuid != null)
 			{
-				Node colorNode = GetGroupColorNode(editingGuid);
+				var colorNode = GetGroupColorNode(editingGuid);
 				editingGroupColorNode = colorNode;
 				if (colorNode != null)
 				{
@@ -521,13 +542,13 @@ namespace SGV
 		private static void GetColorPickerType()
 		{
 			// pretty hacky
-			Assembly assembly = Assembly.Load(new AssemblyName("UnityEditor"));
+			var assembly = Assembly.Load(new AssemblyName("UnityEditor"));
 			colorPickerType = assembly.GetType("UnityEditor.ColorPicker");
 		}
 
 		private static MethodInfo showColorPicker;
 
-		public static void ShowColorPicker(Action<Color> action, Color initalColor, bool showAlpha, bool hdr)
+		public static void ShowColorPicker(Action<Color> action, Color initialColor, bool showAlpha, bool hdr)
 		{
 			// Couldn't figure out a way to show the colour picker from UIElements, so... reflection!
 			// Show(Action<Color> colorChangedCallback, Color col, bool showAlpha = true, bool hdr = false)
@@ -535,29 +556,29 @@ namespace SGV
 			if (colorPickerType == null) GetColorPickerType();
 			if (showColorPicker == null)
 			{
-				showColorPicker = colorPickerType.GetMethod("Show",
-				                                            new Type[] { typeof(Action<Color>), typeof(Color), typeof(bool), typeof(bool) }
+				showColorPicker = colorPickerType?.GetMethod("Show",
+				                                             new[] { typeof(Action<Color>), typeof(Color), typeof(bool), typeof(bool) }
 				);
 			}
 
-			showColorPicker.Invoke(null, new object[] { action, initalColor, showAlpha, hdr });
+			showColorPicker?.Invoke(null, new object[] { action, initialColor, showAlpha, hdr });
 		}
 
-		static void BuildContextualMenu(ContextualMenuPopulateEvent evt)
+		private static void BuildContextualMenu(ContextualMenuPopulateEvent evt)
 		{
 			evt.menu.AppendSeparator();
 			evt.menu.AppendAction("Edit Group Color", OnMenuAction, DropdownMenuAction.AlwaysEnabled);
 		}
 
-		static void OnMenuAction(DropdownMenuAction action)
+		private static void OnMenuAction(DropdownMenuAction action)
 		{
 			if (editingGroup == null) return;
 			//Debug.Log("OnMenuAction " + editingGroup.title);
 
-			string guid = GetGroupGuid(editingGroup);
+			var guid = GetGroupGuid(editingGroup);
 			if (guid == null) return;
 
-			Node colorNode = GetGroupColorNode(guid);
+			var colorNode = GetGroupColorNode(guid);
 			if (colorNode == null)
 			{
 				// We store the group colour in a hidden colour node
@@ -571,7 +592,7 @@ namespace SGV
 			editingGuid = guid;
 		}
 
-		private static ContextualMenuManipulator manipulator = new ContextualMenuManipulator(BuildContextualMenu);
+		private static ContextualMenuManipulator manipulator = new(BuildContextualMenu);
 
 		private static Group editingGroup;
 		private static string editingGuid;
@@ -594,13 +615,17 @@ namespace SGV
 			// https://github.com/Unity-Technologies/Graphics/blob/master/com.unity.shadergraph/Editor/Data/Nodes/AbstractMaterialNode.cs
 
 			if (synonymsField == null) synonymsField = abstractMaterialNodeType.GetField("synonyms");
-			synonymsField.SetValue(nodeToAdd, new string[] { "GroupColor" });
+			synonymsField.SetValue(nodeToAdd, new[] { "GroupColor" });
 
 			if (colorProperty == null) colorProperty = colorNodeType.GetProperty("color"); // SG Color struct, not UnityEngine.Color
-			var colorStruct = colorProperty.GetValue(nodeToAdd);
-			if (colorField == null) colorField = colorStruct.GetType().GetField("color");
-			colorField.SetValue(colorStruct, new Color(0.1f, 0.1f, 0.1f, 0.1f));
-			colorProperty.SetValue(nodeToAdd, colorStruct);
+			var colorStruct = colorProperty?.GetValue(nodeToAdd);
+			if (colorField == null)
+			{
+				colorField = colorStruct?.GetType().GetField("color");
+			}
+
+			colorField?.SetValue(colorStruct, new Color(0.1f, 0.1f, 0.1f, 0.1f));
+			colorProperty?.SetValue(nodeToAdd, colorStruct);
 
 			if (groupProperty == null)
 				groupProperty = abstractMaterialNodeType.GetProperty("group", bindingFlags); // Type : GroupData
@@ -609,7 +634,7 @@ namespace SGV
 			if (previewExpandedProperty == null)
 				previewExpandedProperty = abstractMaterialNodeType.GetProperty("previewExpanded", bindingFlags); // Type : Bool
 
-			previewExpandedProperty.SetValue(nodeToAdd, false);
+			previewExpandedProperty?.SetValue(nodeToAdd, false);
 
 			var drawState = drawStateProperty.GetValue(nodeToAdd);
 			if (positionProperty == null)
@@ -617,7 +642,7 @@ namespace SGV
 			if (expandedProperty == null)
 				expandedProperty = drawState.GetType().GetProperty("expanded", bindingFlags);
 
-			Rect r = group.GetPosition();
+			var r = group.GetPosition();
 			r.x += 25;
 			r.y += 60;
 			positionProperty.SetValue(drawState, r);
@@ -627,9 +652,11 @@ namespace SGV
 
 			// GraphData.AddNode(abstractMaterialNode)
 			if (addNodeMethod == null)
+			{
 				addNodeMethod = graphDataType.GetMethod("AddNode", bindingFlags);
+			}
 
-			addNodeMethod.Invoke(graphData, new object[] { nodeToAdd });
+			addNodeMethod.Invoke(graphData, new[] { nodeToAdd });
 		}
 
 		private static string GetGroupGuid(Scope scope)
@@ -637,15 +664,15 @@ namespace SGV
 			var groupData = scope.userData;
 			if (groupData == null) return null;
 			if (groupGuidField == null) groupGuidField = groupData.GetType().GetProperty("objectId", bindingFlags);
-			var groupGuid = (string)groupGuidField.GetValue(groupData);
+			var groupGuid = (string)groupGuidField?.GetValue(groupData);
 			//Debug.Log("GroupGuid : " + groupGuid);
 			return groupGuid;
 		}
 
 		private static Node GetGroupColorNode(string guid)
 		{
-			List<Node> nodes = m_graphView.nodes.ToList();
-			foreach (Node node in nodes)
+			var nodes = m_graphView.nodes.ToList();
+			foreach (var node in nodes)
 			{
 				if (node.title.Equals("Color"))
 				{

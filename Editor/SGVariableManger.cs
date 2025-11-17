@@ -5,6 +5,7 @@ using UnityEditor;
 using System;
 using System.Linq;
 using System.Reflection;
+using System.Threading.Tasks;
 using JetBrains.Annotations;
 using UnityEngine.UIElements;
 using UnityEditor.Experimental.GraphView;
@@ -194,9 +195,9 @@ namespace SGV
 		private static void UpdateVariableNodes()
 		{
 			HandlePortUpdates();
-
-			void NodeAction(Node node)
-			{
+			
+			m_graphView.nodes.ForEach(node =>
+			{	
 				if (node == null)
 				{
 					return;
@@ -204,258 +205,268 @@ namespace SGV
 
 				if (node.title.Equals("Set"))
 				{
-					var field = TryGetTextField(node);
-					if (field == null)
-					{
-						// 'Set' Setup (called once)
-						field = CreateTextField(node, out var variableName);
-						field.style.marginLeft = 25;
-						field.style.marginRight = 4;
-						if (!variableName.Equals(""))
-						{
-							// Register the node
-							Register("", variableName, node);
-						}
-
-						field.RegisterValueChangedCallback(x => Register(x.previousValue, x.newValue, node));
-
-						// Setup Node Type (Vector/Float)
-						var inputPorts = GetInputPorts(node);
-						Port connectedOutput = null;
-						foreach (var input in inputPorts.ToList())
-						{
-							connectedOutput = GetConnectedPort(input);
-							if (connectedOutput != null)
-							{
-								break;
-							}
-						}
-
-						var portType = NodePortType.Vector4;
-
-						if (connectedOutput != null)
-						{
-							var type = GetPortType(connectedOutput);
-							if (type.Contains("Vector1"))
-							{
-								portType = NodePortType.Float;
-							}
-							else if (type.Contains("Vector2"))
-							{
-								portType = NodePortType.Vector2;
-							}
-							else if (type.Contains("Vector3"))
-							{
-								portType = NodePortType.Vector3;
-							}
-							else if (type.Contains("DynamicVector") || type.Contains("DynamicValue"))
-							{
-								// Handles output slots that can change between vector types (or vector/matrix types)
-								// e.g. Most math based nodes use DynamicVector. Multiply uses DynamicValue
-								var materialSlot = GetMaterialSlot(connectedOutput);
-								var dynamicTypeField = materialSlot?.GetType().GetField("m_ConcreteValueType", bindingFlags);
-								var typeString = dynamicTypeField?.GetValue(materialSlot).ToString() ?? string.Empty;
-								
-								if (typeString.Equals("Vector1"))
-								{
-									portType = NodePortType.Float;
-								}
-								else if (typeString.Equals("Vector2"))
-								{
-									portType = NodePortType.Vector2;
-								}
-								else if (typeString.Equals("Vector3"))
-								{
-									portType = NodePortType.Vector3;
-								}
-								else
-								{
-									portType = NodePortType.Vector4;
-								}
-							}
-							// same as some later code in HandlePortUpdates, should really refactor into it's own method
-
-							// Hide all input ports & make sure they are connected (probably could just connect based on port type, but this is easier)
-							foreach (var input in inputPorts.ToList())
-							{
-								HideInputPort(input);
-
-								//DisconnectAllEdges(node, input); // avoid disconnecting... seems this causes errors in some sg/unity versions
-								Connect(connectedOutput, input);
-							}
-						}
-
-						// Set type (shows required port)
-						SetNodePortType(node, portType);
-
-						// Test for invalid connections
-						var outputPorts = GetOutputPorts(node);
-						foreach (var output in outputPorts.ToList())
-						{
-							var connectedInput = GetConnectedPort(output);
-							if (connectedInput != null && !connectedInput.node.title.Equals("Get"))
-							{
-								DisconnectAllEdges(node, output);
-							}
-							
-							// Not allowed to connect to the outputs of 'Set' node
-							// (unless it's the 'Get' node, which is connected automatically)
-							// This can happen if node was created while dragging an edge from an input port
-						}
-
-						// Register methods to port.OnConnect / port.OnDisconnect, (is internal so we use reflection)
-						inputPorts.ForEach(port =>
-						{
-							RegisterPortDelegates(port, OnRegisterNodeInputPortConnected, OnRegisterNodeInputPortDisconnected);
-						});
-						// If this breaks, an alternative is to just check the ports each frame for different types
-					}
-					else
-					{
-						// 'Set' Update (called each frame)
-						if (m_loadVariables)
-						{
-							Register("", field.value, node);
-						}
-
-						var inputPorts = GetInputPorts(node);
-						var outputPorts = GetOutputPorts(node);
-						var inputPort = GetActivePort(inputPorts);
-
-						// Make edges invisible
-						Action<Port> portAction = output =>
-						{
-							foreach (var edge in output.connections)
-							{
-								if (edge.input.node.title.Equals("Get"))
-								{
-									if (edge.visible && !m_debugDontHideEdges)
-									{
-										edge.visible = false;
-									}
-								}
-							}
-						};
-						outputPorts.ForEach(portAction);
-
-						// Make edges invisible (if not active input port)
-						portAction = input =>
-						{
-							foreach (var edge in input.connections)
-							{
-								if (edge.input != inputPort)
-								{
-									if (edge.visible && !m_debugDontHideEdges)
-									{
-										edge.visible = false;
-									}
-								}
-							}
-						};
-						inputPorts.ForEach(portAction);
-
-						if (!node.expanded)
-						{
-							var hasPorts = node.RefreshPorts();
-							if (!hasPorts)
-							{
-								HideElement(field);
-							}
-						}
-						else
-						{
-							ShowElement(field);
-						}
-					}
+					//node.
+					SetNode(node);
 				}
 				else if (node.title.Equals("Get"))
 				{
-					#if UNITY_2021_2_OR_NEWER
-					var field = TryGetDropdownField(node);
-					#else
-					// Unity 2020 did not have DropdownField,
-					// (and 2021.1 doesn't have DropdownField.choices)
-					// so for these, keep using TextField instead
-					TextField field = TryGetTextField(node);
-					#endif
-					if (field == null)
+					GetNode(node);
+				}
+			});
+		}
+		
+		private static void SetNode(Node node)
+		{
+			var field = TryGetTextField(node);
+			if (field == null)
+			{
+				// 'Set' Setup (called once)
+				field = CreateTextField(node, out var variableName);
+				field.style.marginLeft = 25;
+				field.style.marginRight = 4;
+				if (!variableName.Equals(""))
+				{
+					// Register the node
+					Register("", variableName, node);
+				}
+
+				field.RegisterValueChangedCallback(x => Register(x.previousValue, x.newValue, node));
+
+				// Setup Node Type (Vector/Float)
+				var inputPorts = GetInputPorts(node);
+				Port connectedOutput = null;
+				foreach (var input in inputPorts.ToList())
+				{
+					connectedOutput = GetConnectedPort(input);
+					if (connectedOutput != null)
 					{
-						// 'Get' Setup (called once)
-						#if UNITY_2021_2_OR_NEWER
-						field = CreateDropDownField(node);
-						#else
-						field = CreateTextField(node, out var variableName);
-						#endif
-						field.style.marginLeft = 4;
-						field.style.marginRight = 25;
-						field.RegisterValueChangedCallback(x => Get(x.newValue, node));
-
-						var outputPorts = GetOutputPorts(node);
-						var outputVector = outputPorts.AtIndex(0);
-						var outputFloat = outputPorts.AtIndex(1);
-
-						// If both output ports are visible, do setup :
-						// (as 'Set' node may trigger it first)
-						if (!IsPortHidden(outputVector) && !IsPortHidden(outputFloat))
-						{
-							var key = GetSerializedVariableKey(node);
-							ResizeNodeToFitText(node, key);
-
-							//Get(key, node); // causes errors in 2022
-							// (I think due to the DisconnectAllInputs then reconnecting later when 'Set' node triggers linking...)
-
-							key = key.Trim().ToUpper();
-							if (m_variableDict.TryGetValue(key, out var varNode))
-							{
-								// Make sure 'Get' node matches 'Set' type
-								// accounts for node being copied
-								SetNodePortType(node, GetNodePortType(varNode));
-							}
-							else
-							{
-								SetNodePortType(node, NodePortType.Vector4); // default to vector (hides other ports)
-							}
-						}
-						else if (m_loadVariables)
-						{
-							var key = GetSerializedVariableKey(node);
-							ResizeNodeToFitText(node, key);
-						}
-
-						var connectedInputF = GetConnectedPort(outputFloat);
-						var portType = GetNodePortType(node);
-						if (connectedInputF != null && portType == NodePortType.Vector4)
-						{
-							// Something is connected to the Float port, when the type is Vector
-							// This can happen if node was created while dragging an edge from an input port
-							MoveAllOutputs(outputFloat, outputVector);
-						}
+						break;
 					}
-					else
+				}
+
+				var portType = NodePortType.Vector4;
+
+				if (connectedOutput != null)
+				{
+					var type = GetPortType(connectedOutput);
+					if (type.Contains("Vector1"))
 					{
-						// 'Get' Update (called each frame)
-						if (!node.expanded)
+						portType = NodePortType.Float;
+					}
+					else if (type.Contains("Vector2"))
+					{
+						portType = NodePortType.Vector2;
+					}
+					else if (type.Contains("Vector3"))
+					{
+						portType = NodePortType.Vector3;
+					}
+					else if (type.Contains("DynamicVector") || type.Contains("DynamicValue"))
+					{
+						// Handles output slots that can change between vector types (or vector/matrix types)
+						// e.g. Most math based nodes use DynamicVector. Multiply uses DynamicValue
+						var materialSlot = GetMaterialSlot(connectedOutput);
+						var dynamicTypeField = materialSlot?.GetType().GetField("m_ConcreteValueType", bindingFlags);
+						var typeString = dynamicTypeField?.GetValue(materialSlot).ToString() ?? string.Empty;
+						
+						if (typeString.Equals("Vector1"))
 						{
-							var hasPorts = node.RefreshPorts();
-							if (!hasPorts)
-							{
-								HideElement(field);
-							}
+							portType = NodePortType.Float;
+						}
+						else if (typeString.Equals("Vector2"))
+						{
+							portType = NodePortType.Vector2;
+						}
+						else if (typeString.Equals("Vector3"))
+						{
+							portType = NodePortType.Vector3;
 						}
 						else
 						{
-							#if UNITY_2021_2_OR_NEWER
-							field.choices = m_variableNames;
-							#endif
-							ShowElement(field);
+							portType = NodePortType.Vector4;
 						}
 					}
+					// same as some later code in HandlePortUpdates, should really refactor into it's own method
+
+					// Hide all input ports & make sure they are connected (probably could just connect based on port type, but this is easier)
+					foreach (var input in inputPorts.ToList())
+					{
+						HideInputPort(input);
+
+						//DisconnectAllEdges(node, input); // avoid disconnecting... seems this causes errors in some sg/unity versions
+						Connect(connectedOutput, input);
+					}
+				}
+
+				// Set type (shows required port)
+				SetNodePortType(node, portType);
+
+				// Test for invalid connections
+				var outputPorts = GetOutputPorts(node);
+				foreach (var output in outputPorts.ToList())
+				{
+					var connectedInput = GetConnectedPort(output);
+					if (connectedInput != null && !connectedInput.node.title.Equals("Get"))
+					{
+						DisconnectAllEdges(node, output);
+					}
+					
+					// Not allowed to connect to the outputs of 'Set' node
+					// (unless it's the 'Get' node, which is connected automatically)
+					// This can happen if node was created while dragging an edge from an input port
+				}
+
+				// Register methods to port.OnConnect / port.OnDisconnect, (is internal so we use reflection)
+				inputPorts.ForEach(port =>
+				{
+					RegisterPortDelegates(port, OnRegisterNodeInputPortConnected, OnRegisterNodeInputPortDisconnected);
+				});
+				// If this breaks, an alternative is to just check the ports each frame for different types
+			}
+			else
+			{
+				// 'Set' Update (called each frame)
+				if (m_loadVariables)
+				{
+					Register("", field.value, node);
+				}
+
+				var inputPorts = GetInputPorts(node);
+				var outputPorts = GetOutputPorts(node);
+				var inputPort = GetActivePort(inputPorts);
+
+				// Make edges invisible
+				Action<Port> portAction = output =>
+				{
+					foreach (var edge in output.connections)
+					{
+						if (edge.input.node.title.Equals("Get"))
+						{
+							if (edge.visible && !m_debugDontHideEdges)
+							{
+								edge.visible = false;
+							}
+						}
+					}
+				};
+				outputPorts.ForEach(portAction);
+
+				// Make edges invisible (if not active input port)
+				portAction = input =>
+				{
+					foreach (var edge in input.connections)
+					{
+						if (edge.input != inputPort)
+						{
+							if (edge.visible && !m_debugDontHideEdges)
+							{
+								edge.visible = false;
+							}
+						}
+					}
+				};
+				inputPorts.ForEach(portAction);
+
+				if (!node.expanded)
+				{
+					var hasPorts = node.RefreshPorts();
+					if (!hasPorts)
+					{
+						HideElement(field);
+					}
+				}
+				else
+				{
+					ShowElement(field);
 				}
 			}
-
-			m_graphView.nodes.ForEach(NodeAction);
 		}
 
+		private static void GetNode(Node node)
+		{
+		#if UNITY_2021_2_OR_NEWER
+			var field = TryGetDropdownField(node);
+		#else
+			// Unity 2020 did not have DropdownField,
+			// (and 2021.1 doesn't have DropdownField.choices)
+			// so for these, keep using TextField instead
+			TextField field = TryGetTextField(node);
+			#endif
+			if (field == null)
+			{
+				// 'Get' Setup (called once)
+				#if UNITY_2021_2_OR_NEWER
+				field = CreateDropDownField(node);
+				#else
+				field = CreateTextField(node, out var variableName);
+				#endif
+				field.style.marginLeft = 4;
+				field.style.marginRight = 25;
+				field.RegisterValueChangedCallback(x => Get(x.newValue, node));
+
+				var outputPorts = GetOutputPorts(node);
+				var outputVector = outputPorts.AtIndex(0);
+				var outputFloat = outputPorts.AtIndex(1);
+				var outputTexture = outputPorts.AtIndex(2);
+
+				// If both output ports are visible, do setup :
+				// (as 'Set' node may trigger it first)
+				if (!IsPortHidden(outputVector) && !IsPortHidden(outputFloat) && !IsPortHidden(outputTexture))
+				{
+					var key = GetSerializedVariableKey(node);
+					ResizeNodeToFitText(node, key);
+
+					//Get(key, node); // causes errors in 2022
+					// (I think due to the DisconnectAllInputs then reconnecting later when 'Set' node triggers linking...)
+
+					key = key.Trim().ToUpper();
+					if (m_variableDict.TryGetValue(key, out var varNode))
+					{
+						// Make sure 'Get' node matches 'Set' type
+						// accounts for node being copied
+						SetNodePortType(node, GetNodePortType(varNode));
+					}
+					else
+					{
+						SetNodePortType(node, NodePortType.Vector4); // default to vector (hides other ports)
+					}
+				}
+				else if (m_loadVariables)
+				{
+					var key = GetSerializedVariableKey(node);
+					ResizeNodeToFitText(node, key);
+				}
+
+				var connectedInputF = GetConnectedPort(outputFloat);
+				var portType = GetNodePortType(node);
+				if (connectedInputF != null && portType == NodePortType.Vector4)
+				{
+					// Something is connected to the Float port, when the type is Vector
+					// This can happen if node was created while dragging an edge from an input port
+					MoveAllOutputs(outputFloat, outputVector);
+				}
+			}
+			else
+			{
+				// 'Get' Update (called each frame)
+				if (!node.expanded)
+				{
+					var hasPorts = node.RefreshPorts();
+					if (!hasPorts)
+					{
+						HideElement(field);
+					}
+				}
+				else
+				{
+					#if UNITY_2021_2_OR_NEWER
+					field.choices = m_variableNames;
+					#endif
+					ShowElement(field);
+				}
+			}
+		}
+		
 		private static void HandlePortUpdates()
 		{
 			for (var i = m_editedPorts.Count - 1; i >= 0; i--)
@@ -745,7 +756,7 @@ namespace SGV
 			Vector4, // also DynamicVector, DynamicValue
 			Float,
 			Vector2,
-			Vector3
+			Vector3,
 		}
 
 		public static UQueryState<Port> GetInputPorts(Node node)
@@ -852,6 +863,7 @@ namespace SGV
 				var inputFloat = inputPorts.AtIndex(1);
 				var inputVector2 = inputPorts.AtIndex(2);
 				var inputVector3 = inputPorts.AtIndex(3);
+				
 				if (!IsPortHidden(inputVector))
 				{
 					currentPortType = NodePortType.Vector4;
@@ -875,6 +887,7 @@ namespace SGV
 				var outputFloat = outputPorts.AtIndex(1);
 				var outputVector2 = outputPorts.AtIndex(2);
 				var outputVector3 = outputPorts.AtIndex(3);
+				
 				if (!IsPortHidden(outputVector))
 				{
 					currentPortType = NodePortType.Vector4;
@@ -898,7 +911,7 @@ namespace SGV
 
 		private static void SetNodePortType(Node node, NodePortType portType)
 		{
-			var isRegisterNode = node.title.Equals("Set");
+			var isSetNode = node.title.Equals("Set");
 
 			var inputPorts = GetInputPorts(node);
 			var outputPorts = GetOutputPorts(node);
@@ -908,19 +921,23 @@ namespace SGV
 
 			var inputVector = inputPorts.AtIndex(0);
 			var inputFloat = inputPorts.AtIndex(1);
+
+			
 			var outputVector = outputPorts.AtIndex(0);
 			var outputFloat = outputPorts.AtIndex(1);
 
 			// Hide Ports
 			HideInputPort(inputVector);
 			HideInputPort(inputFloat);
+			
 			HideOutputPort(outputVector);
 			HideOutputPort(outputFloat);
-
-			if (isRegisterNode)
+			
+			if (isSetNode)
 			{
 				var inputVector2 = inputPorts.AtIndex(2);
 				var inputVector3 = inputPorts.AtIndex(3);
+				
 				HideInputPort(inputVector2);
 				HideInputPort(inputVector3);
 			}
@@ -928,6 +945,7 @@ namespace SGV
 			{
 				var outputVector2 = outputPorts.AtIndex(2);
 				var outputVector3 = outputPorts.AtIndex(3);
+				
 				HideOutputPort(outputVector2);
 				HideOutputPort(outputVector3);
 			}
@@ -936,7 +954,7 @@ namespace SGV
 			Port newOutput = null;
 			if (portType == NodePortType.Vector4)
 			{
-				if (isRegisterNode)
+				if (isSetNode)
 				{
 					ShowInputPort(inputVector);
 				}
@@ -947,7 +965,7 @@ namespace SGV
 			}
 			else if (portType == NodePortType.Float)
 			{
-				if (isRegisterNode)
+				if (isSetNode)
 				{
 					ShowInputPort(inputFloat);
 				}
@@ -958,7 +976,7 @@ namespace SGV
 			}
 			else if (portType == NodePortType.Vector2)
 			{
-				if (isRegisterNode)
+				if (isSetNode)
 				{
 					var inputVector2 = inputPorts.AtIndex(2);
 					ShowInputPort(inputVector2);
@@ -971,7 +989,7 @@ namespace SGV
 			}
 			else if (portType == NodePortType.Vector3)
 			{
-				if (isRegisterNode)
+				if (isSetNode)
 				{
 					var inputVector3 = inputPorts.AtIndex(3);
 					ShowInputPort(inputVector3);
@@ -984,7 +1002,7 @@ namespace SGV
 			}
 
 			// move outputs to "active" port
-			if (!isRegisterNode && typeChanged && newOutput != null)
+			if (!isSetNode && typeChanged && newOutput != null)
 			{
 				Port currentOutput;
 				if (currentPortType == NodePortType.Float)
@@ -999,17 +1017,21 @@ namespace SGV
 				{
 					currentOutput = outputPorts.AtIndex(2);
 				}
-				else
+				else if (currentPortType == NodePortType.Vector3)
 				{
-					//if (currentPortType == NodePortType.Vector3){
 					currentOutput = outputPorts.AtIndex(3);
 				}
+				else
+				{
+					currentOutput = outputPorts.AtIndex(2);
+				}
+				
 
 				//MoveAllOutputs(node, currentOutput, newOutput);
 				MoveAllOutputs(currentOutput, newOutput);
 			}
 
-			if (isRegisterNode && typeChanged)
+			if (isSetNode && typeChanged)
 			{
 				// Relink to 'Get' nodes
 				var nodes = LinkToAllGetVariableNodes(GetSerializedVariableKey(node).ToUpper(), node);
@@ -1076,6 +1098,7 @@ namespace SGV
 
 			previousValue = previousValue.Trim();
 			newValue = newValue.Trim();
+			Debug.Log(newValue);
 
 			// dictionary keys (always upper case)
 			var previousKey = previousValue.ToUpper();
