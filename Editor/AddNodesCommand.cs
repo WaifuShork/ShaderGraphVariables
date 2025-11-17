@@ -4,64 +4,56 @@ using UnityEditor;
 using System;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using JetBrains.Annotations;
 using UnityEngine.UIElements;
 using UnityEditor.Experimental.GraphView;
 using UnityEditor.ShortcutManagement;
-/*
-Author : Cyanilux (https://twitter.com/Cyanilux)
-Github Repo : https://github.com/Cyanilux/ShaderGraphVariables
-
-Extra Features :
-	- Colour of groups can be changed
-		- Right-click group the group name and select Edit Group Colour
-		- A colour picker should open, allowing you to choose a colour (including alpha)
-		- Behind the scenes this creates a hidden Color node in the group. It can only be moved with
-			the group so try to move the group as a whole rather than nodes inside it.
-	- 'Port Swap' Hotkey
-		- "S" key will swap the first two ports (usually A and B) on all currently selected nodes
-		- Enabled for nodes : Add, Subtract, Multiply, Divide, Maximum, Minimum, Lerp, Inverse Lerp, Step and Smoothstep
-		- Note : It needs at least one connection to swap. If both ports are empty, it won't swap the values as it doesn't
-			update properly and I couldn't find a way to force-update it.
-	- 'Add Node' Hotkeys (Default : Alpha Number keys, 1 to 0)
-		- Bind 10 hotkeys for quickly adding specific nodes to the graph (at mouse position)
-		- Defaults are :
-			- 1 : Add
-			- 2 : Subtract
-			- 3 : Multiply
-			- 4 : Lerp
-			- 5 : Split
-			- 6 : One Minus
-			- 7 : Negate
-			- 8 : Absolute
-			- 9 : Step
-			- 0 : Smoothstep
-		- To change nodes : Tools → SGVariablesExtraFeatures → Rebind Node Bindings
-	- To edit keybindings : Edit → Shortcuts (search for SGVariables)
-		- Note, try to avoid conflicts with SG's hotkeys (mainly A, F and O) as those can't be rebound
-		- https://www.cyanilux.com/tutorials/intro-to-shader-graph/#shortcuts
-
-*/
-using static SGV.SGVariableManger;
+using static SGV.VariableManger;
 
 namespace SGV
 {
-	[PublicAPI]
-	public class ExtraFeatures
+	internal class CollapseNodesCommand
 	{
-		#region Extra Features (Swap Command)
-
-		public static bool CollapseNewNodes { get; private set; } = false;
-		
-		[MenuItem("Tools/Shader Graph Variables/Settings/Nodes/Collapse New Nodes")]
-		private static void AlwaysCollapse()
+		private static bool s_collapse;
+		static CollapseNodesCommand()
 		{
-			CollapseNewNodes = !CollapseNewNodes;
-			Menu.SetChecked("Tools/Shader Graph Variables/Settings/Nodes/Collapse New Nodes", CollapseNewNodes);
+			s_collapse = EditorPrefs.GetBool("SGV_CollapseNewNodes", false);
 		}
 		
+		[MenuItem("Tools/Shader Graph Variables/Collapse New Nodes")]
+		private static void AlwaysCollapse()
+		{
+			s_collapse = !s_collapse;
+			EditorPrefs.SetBool("SGV_CollapseNewNodes", s_collapse);
+			Menu.SetChecked("Tools/Shader Graph Variables/Collapse New Nodes", s_collapse);
+		}
+
+		public static void CollapseNode(Node node)
+		{
+			if (node.title == "Preview")
+			{
+				return;
+			}
+
+			var userData = node.userData;
+			var nodePreviewMethodInfo = userData?.GetType().GetMethod("set_previewExpanded", bindingFlags | BindingFlags.InvokeMethod);
+			nodePreviewMethodInfo?.Invoke(userData, new object[] { false });
+		}
 		
-		[MenuItem("Tools/Shader Graph Variables/Settings/Nodes/Swap Ports On Selected Nodes _s")]
+		public static void CollapseNode(object userData)
+		{
+			var nodePreviewMethodInfo = userData?.GetType().GetMethod("set_previewExpanded", bindingFlags | BindingFlags.InvokeMethod);
+			nodePreviewMethodInfo?.Invoke(userData, new object[] { false });
+		}
+		
+		//	Debug.Log(JsonUtility.ToJson(s_unityNodes));
+		
+	}
+
+	internal sealed class SwapCommand
+	{
+		[MenuItem("Tools/Shader Graph Variables/Nodes/Swap Ports On Selected Nodes _s")]
 		private static void SwapPortsCommand()
 		{
 			if (!m_sgHasFocus || m_graphView == null) return;
@@ -112,9 +104,12 @@ namespace SGV
 				}
 			}
 		}
+	}
 
-		#endregion
 
+	[PublicAPI]
+	public class AddNodesCommand
+	{
 		#region Extra Features (Add Node Commands)
 
 		private class AddNodeType
@@ -196,8 +191,6 @@ namespace SGV
 				}
 
 				EditorGUILayout.LabelField("To reset to defaults, leave fields blank", EditorStyles.wordWrappedLabel);
-				
-				
 			}
 
 			private void ClearTypes()
@@ -206,7 +199,7 @@ namespace SGV
 			}
 		}
 
-		[MenuItem("Tools/Shader Graph Variables/Settings/Modify Shortcut Nodes", false, 0)]
+		[MenuItem("Tools/Shader Graph Variables/Modify Shortcut Nodes", false, 0)]
 		private static void RebindNodes()
 		{
 			var window = (RebindWindow)EditorWindow.GetWindow(typeof(RebindWindow));
@@ -215,61 +208,61 @@ namespace SGV
 
 		#endregion
 
-		[MenuItem("Tools/Shader Graph Variables/Settings/Nodes/Add Node 1 _1", priority = 1)]
+		[MenuItem("Tools/Shader Graph Variables/Nodes/Add Node 1 _1", priority = 1)]
 		private static void AddNodeCommand1()
 		{
 			AddNodeCommand(1);
 		}
 
-		[MenuItem("Tools/Shader Graph Variables/Settings/Nodes/Add Node 2 _2", priority = 2)]
+		[MenuItem("Tools/Shader Graph Variables/Nodes/Add Node 2 _2", priority = 2)]
 		private static void AddNodeCommand2()
 		{
 			AddNodeCommand(2);
 		}
 
-		[MenuItem("Tools/Shader Graph Variables/Settings/Nodes/Add Node 3 _3", priority = 3)]
+		[MenuItem("Tools/Shader Graph Variables/Nodes/Add Node 3 _3", priority = 3)]
 		private static void AddNodeCommand3()
 		{
 			AddNodeCommand(3);
 		}
 
-		[MenuItem("Tools/Shader Graph Variables/Settings/Nodes/Add Node 4 _4", priority = 4)]
+		[MenuItem("Tools/Shader Graph Variables/Nodes/Add Node 4 _4", priority = 4)]
 		private static void AddNodeCommand4()
 		{
 			AddNodeCommand(4);
 		}
 
-		[MenuItem("Tools/Shader Graph Variables/Settings/Nodes/Add Node 5 _5", priority = 5)]
+		[MenuItem("Tools/Shader Graph Variables/Nodes/Add Node 5 _5", priority = 5)]
 		private static void AddNodeCommand5()
 		{
 			AddNodeCommand(5);
 		}
 
-		[MenuItem("Tools/Shader Graph Variables/Settings/Nodes/Add Node 6 _6", priority = 6)]
+		[MenuItem("Tools/Shader Graph Variables/Nodes/Add Node 6 _6", priority = 6)]
 		private static void AddNodeCommand6()
 		{
 			AddNodeCommand(6);
 		}
 
-		[MenuItem("Tools/Shader Graph Variables/Settings/Nodes/Add Node 7 _7", priority = 7)]
+		[MenuItem("Tools/Shader Graph Variables/Nodes/Add Node 7 _7", priority = 7)]
 		private static void AddNodeCommand7()
 		{
 			AddNodeCommand(7);
 		}
 
-		[MenuItem("Tools/Shader Graph Variables/Settings/Nodes/Add Node 8 _8", priority = 8)]
+		[MenuItem("Tools/Shader Graph Variables/Nodes/Add Node 8 _8", priority = 8)]
 		private static void AddNodeCommand8()
 		{
 			AddNodeCommand(8);
 		}
 
-		[MenuItem("Tools/Shader Graph Variables/Settings/Nodes/Add Node 9 _9", priority = 9)]
+		[MenuItem("Tools/Shader Graph Variables/Nodes/Add Node 9 _9", priority = 9)]
 		private static void AddNodeCommand9()
 		{
 			AddNodeCommand(9);
 		}
 
-		[MenuItem("Tools/Shader Graph Variables/Settings/Nodes/Add Node 10 _0", priority = 10)]
+		[MenuItem("Tools/Shader Graph Variables/Nodes/Add Node 10 _0", priority = 10)]
 		private static void AddNodeCommand10()
 		{
 			AddNodeCommand(10);
@@ -365,7 +358,7 @@ namespace SGV
 			{
 				expandedProperty = drawState?.GetType().GetProperty("expanded", bindingFlags);
 			}
-			
+
 			positionProperty?.SetValue(drawState, position);
 			drawStateProperty?.SetValue(nodeToAdd, drawState);
 
@@ -392,19 +385,14 @@ namespace SGV
 			}
 
 			addNodeMethod.Invoke(graphData, new[] { nodeToAdd });
-			CollapseNode(nodeToAdd);
-			
+			CollapseNodesCommand.CollapseNode(nodeToAdd);
+
 			if (m_debugMessages)
 			{
 				Debug.Log("Added Node of Type " + type);
 			}
 		}
 
-		public static void CollapseNode(object userData)
-		{
-			var nodePreviewMethodInfo = userData?.GetType().GetMethod("set_previewExpanded", bindingFlags | BindingFlags.InvokeMethod);
-			nodePreviewMethodInfo?.Invoke(userData, new object[] { false });
-		}
 
 		// Support SubGraphs
 		private static Type subGraphAssetType;
@@ -420,6 +408,7 @@ namespace SGV
 		}
 
 		#endregion
+
 
 		#region Extra Features (Group Colours)
 
@@ -451,7 +440,6 @@ namespace SGV
 			// Load Group Colours
 			m_graphView.nodes.ForEach(node =>
 			{
-				
 				/*
 				if (node.title.Equals("Color") && node.visible)
 				{
@@ -564,7 +552,7 @@ namespace SGV
 				editingGroupColorNode = null;
 			}
 		}
-		
+
 
 		private static Type colorPickerType;
 
@@ -662,7 +650,7 @@ namespace SGV
 				drawStateProperty = abstractMaterialNodeType.GetProperty("drawState", bindingFlags); // Type : DrawState
 			if (previewExpandedProperty == null)
 				previewExpandedProperty = abstractMaterialNodeType.GetProperty("previewExpanded", bindingFlags); // Type : Bool
-			
+
 			var drawState = drawStateProperty?.GetValue(nodeToAdd);
 			if (positionProperty == null)
 				positionProperty = drawState.GetType().GetProperty("position", bindingFlags);

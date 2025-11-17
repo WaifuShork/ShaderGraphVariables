@@ -5,6 +5,7 @@ using UnityEditor;
 using System;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
 using UnityEngine.UIElements;
@@ -60,7 +61,7 @@ Known Issues :
 namespace SGV
 {
 	[InitializeOnLoad]
-	public class SGVariableManger
+	public class VariableManger
 	{
 		// Debug ----------------------------------------------
 		internal static readonly bool m_debugMessages = false;
@@ -83,7 +84,7 @@ namespace SGV
 		private static bool m_isEnabled;
 		//private static bool revalidateGraph = false;
 
-		static SGVariableManger()
+		static VariableManger()
 		{
 			if (m_disableTool)
 			{
@@ -91,6 +92,14 @@ namespace SGV
 			}
 			
 			Start();
+
+			/*var buffer = new StringBuilder();
+			foreach (var (key, value) in CollapseNodesCommand.s_unityNodes)
+			{
+				buffer.AppendLine($"{key},{value}");
+			}*/
+			
+			
 		}
 
 		private static void Start()
@@ -107,7 +116,7 @@ namespace SGV
 
 			if (m_graphView != null)
 			{
-				m_previousNodeCount = m_graphView.nodes.Count();
+				m_nodes = m_graphView.nodes.ToList();
 			}
 		}
 
@@ -127,7 +136,7 @@ namespace SGV
 		// (Font needed to get string width for variable fields)
 		private static Font m_loadedFont; // = EditorGUIUtility.LoadRequired("Fonts/Inter/Inter-Regular.ttf") as Font;
 
-		private static int m_previousNodeCount;
+		private static List<Node> m_nodes = new();
 		
 		private static void CheckForGraphs()
 		{
@@ -174,7 +183,7 @@ namespace SGV
 
 					if (!m_disableExtraFeatures)
 					{
-						ExtraFeatures.UpdateExtraFeatures();
+						AddNodesCommand.UpdateExtraFeatures();
 					}
 
 					m_loadVariables = false;
@@ -219,12 +228,10 @@ namespace SGV
 					GetNode(node);
 				}
 
-				if (ExtraFeatures.CollapseNewNodes)
+				if (!m_nodes.Contains(node))
 				{
-					if (node.title != "Preview")
-					{
-						ExtraFeatures.CollapseNode(node.userData);
-					}
+					m_nodes.Add(node);
+					CollapseNodesCommand.CollapseNode(node);
 				}
 			});
 		}
